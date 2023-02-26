@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33205.214
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImproveTransparentPixels", "ImproveTransparentPixels.csproj", "{1F31F9FC-63E2-44F0-B98B-3D6D0DDD88EC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1F31F9FC-63E2-44F0-B98B-3D6D0DDD88EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F31F9FC-63E2-44F0-B98B-3D6D0DDD88EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F31F9FC-63E2-44F0-B98B-3D6D0DDD88EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F31F9FC-63E2-44F0-B98B-3D6D0DDD88EC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B1310BBF-6D45-450A-BFAA-AC0AD0D1E1D6}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ImproveTransparentPixels": {
+      "commandName": "Project",
+      "commandLineArgs": "-fast -8 \"C:\\Users\\neil_\\Documents\\Work\\solidify\\test.png\""
+    }
+  }
+}
