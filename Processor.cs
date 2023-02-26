@@ -96,7 +96,7 @@ namespace ImproveTransparentPixels
         }
 
 
-        //TODO - update sampling pattern?  Gaussian?
+        //TODO - update sampling pattern?  Gaussian?  Honestly it looks pretty fine even if you just set all weights to 1
         private void SetSampling(out (int x, int y)[] samplePattern, out float[] sampleWeights)
         {
             List<(int x, int y)> offsets = new();
@@ -157,14 +157,14 @@ namespace ImproveTransparentPixels
             return positionAndColor;
         }
 
-        private Span<ushort> GetPixel(Span<ushort> pixels, int x, int y) => pixels.Slice((y* _width + x) * _channelCount, _channelCount);
+        private Span<ushort> GetPixel(Span<ushort> pixels, int x, int y) => pixels.Slice((y * _width + x) * _channelCount, _channelCount);
 
         private void UpdateImage(List<PositionAndColor> currentWorkload, Span<ushort> pixels)
         {
             for (int indexInWorkload = 0; indexInWorkload < currentWorkload.Count; indexInWorkload++)
             {
                 var positionAndColor = currentWorkload[indexInWorkload];
-                var pixel = GetPixel( pixels, positionAndColor.X, positionAndColor.Y);
+                var pixel = GetPixel(pixels, positionAndColor.X, positionAndColor.Y);
                 for (int x = 0; x < _colorChannelIndices.Length; ++x)
                 {
                     int newValue = (int)(positionAndColor[x] + 0.5f);
@@ -175,7 +175,6 @@ namespace ImproveTransparentPixels
 
                     pixel[_colorChannelIndices[x]] = (ushort)Math.Clamp(newValue, ushort.MinValue, ushort.MaxValue);
                 }
-                pixel[_alphaChannelIndex] = ushort.MaxValue;
             }
         }
 
@@ -264,13 +263,45 @@ namespace ImproveTransparentPixels
             }
         }
 
+        public void SetColor(MagickColor color)
+        {
+            ushort[] colorArray = _srcImage.Channels.Select(channel => channel switch
+            {
+                PixelChannel.Red => color.R,
+                PixelChannel.Green => color.G,
+                PixelChannel.Blue => color.B,
+                PixelChannel.Alpha => (ushort)0,
+                _ => throw new Exception("Unhandled channel " + channel)
+            }).ToArray();
+
+            for (int y = 0; y < _height; y++)
+            {
+                for (int x = 0; x < _width; x++)
+                {
+                    if (!_hasData[y, x])
+                    {
+                        var pixel = GetPixel(_pixels, x, y);
+                        colorArray.CopyTo(pixel);
+                        _hasData[y, x] = true;
+                    }
+                }
+            }
+        }
+
         public MagickImage GetOutput()
         {
             MagickImage output = new MagickImage(_srcImage);
-            output.GetPixels().SetArea(0,0,_width,_height,_pixels);
+            output.GetPixels().SetArea(0, 0, _width, _height, _pixels);
             return output;
         }
+
+        public void WriteOuputFile(string filePath) => GetOutput().Write(filePath);
+        public void WritePreviewFile(string filePath)
+        {
+            var image = GetOutput();
+            image.Evaluate(Channels.Alpha, EvaluateOperator.Set, ushort.MaxValue);
+            image.Write(filePath);
+        }
+
     }
 }
-
-
