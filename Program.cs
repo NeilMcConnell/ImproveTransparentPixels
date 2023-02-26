@@ -15,6 +15,7 @@ if (ParseParameters(args, out string inputFilePath,out List<Operation> operation
     {
         MagickNET.Initialize();
         using MagickImage image = new MagickImage(inputFilePath);
+        image.BackgroundColor = MagickColor.FromRgba(0, 0, 0, 0);
         Processor processor = new Processor(image);
         foreach (Operation operation in operations)
         {
