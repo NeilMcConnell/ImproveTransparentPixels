@@ -50,9 +50,12 @@ namespace ImproveTransparentPixels
         private readonly int _channelCount;
         private readonly int _alphaChannelIndex;
         private readonly int[] _colorChannelIndices;
-        private (int x, int y)[] _samplePattern;
-        private float[] _sampleWeights;
+        private readonly (int x, int y)[] _samplePattern;
+        private readonly float[] _sampleWeights;
 
+        //processed image
+        bool[,] _hasData;  //hasData is true if a pixel is non-transparent, or if it has already been processed
+        ushort[] _pixels;
 
 
         public Processor(MagickImage srcImage)
@@ -110,38 +113,21 @@ namespace ImproveTransparentPixels
             }
             samplePattern = offsets.ToArray();
             sampleWeights = weights.ToArray();
+
+            //set up the processed Image
+            _pixels = _srcImage.GetPixels().GetArea(0, 0, _width, _height);
+            _hasData = FindNonTransparentPixels();
         }
 
-
-        public MagickImage ImproveTransparentPixels(int maxDistance, bool runFast) => runFast ? ImproveTransparentPixelsFast(maxDistance) : ImproveTransparentPixels(maxDistance);
-        private MagickImage ImproveTransparentPixels(int maxDistance)
+        private void SolidifyOnce(List<PositionAndColor> currentWorkload, Span<ushort> pixels)
         {
-            var image = new MagickImage(_srcImage);
-            image.CopyPixels(_srcImage); //in theory, this CopyPixels should not be necessary.  In practice, I find that if I don't do it, then all the pixels that I don't explicitly set will get reset to zero
-
-            bool[,] hasData = FindNonTransparentPixels(image);
-            List<PositionAndColor> currentWorkload = FindStartingPixels(hasData);
-
-            while (currentWorkload.Count > 0)
-            {
-                CalculatePixelColors(currentWorkload, image, hasData);
-                UpdateImage(currentWorkload, image);
-                UpdateHasData(currentWorkload, hasData);
-                NextWorkload(currentWorkload, hasData);
-            }
-            return image;
-        }
-
-        private void CalculatePixelColors(List<PositionAndColor> currentWorkload, MagickImage image, bool[,] hasData)
-        {
-            IPixelCollection<ushort> pixels = image.GetPixels();
             for (int indexInWorkload = 0; indexInWorkload < currentWorkload.Count; indexInWorkload++)
             {
-                currentWorkload[indexInWorkload] = CalculatePixelColor(currentWorkload[indexInWorkload], pixels, hasData);
+                currentWorkload[indexInWorkload] = SolidifyOnePixel(currentWorkload[indexInWorkload], pixels);
             }
         }
 
-        private PositionAndColor CalculatePixelColor(PositionAndColor positionAndColor, IPixelCollection<ushort> pixels, bool[,] hasData)
+        private PositionAndColor SolidifyOnePixel(PositionAndColor positionAndColor, Span<ushort> pixels)
         {
             float totalWeight = 0;
             for (int sampleIndex = 0; sampleIndex < _samplePattern.Length; ++sampleIndex)
@@ -149,46 +135,7 @@ namespace ImproveTransparentPixels
                 int sampleX = _samplePattern[sampleIndex].x + positionAndColor.X;
                 int sampleY = _samplePattern[sampleIndex].y + positionAndColor.Y;
 
-                if (SafeGetHasData(sampleX, sampleY, hasData))
-                {
-                    float sampleWeight = _sampleWeights[sampleIndex];
-                    totalWeight += sampleWeight;
-                    var pixel = pixels[sampleX, sampleY];
-                    for (int x = 0; x < _colorChannelIndices.Length; ++x)
-                    {
-                        positionAndColor[x] += pixel.GetChannel(_colorChannelIndices[x]) * sampleWeight;
-                    }
-                }
-            }
-            if (totalWeight == 0)
-            {
-                throw new Exception("Total weight was zero.  Probably there's a pixel in currentWorkLoad that should not be there");
-            }
-            for (int x = 0; x < _colorChannelIndices.Length; ++x)
-            {
-                positionAndColor[x] /= totalWeight;
-            }
-            return positionAndColor;
-        }
-
-
-        private void CalculatePixelColorsFast(List<PositionAndColor> currentWorkload, Span<ushort> pixels, bool[,] hasData)
-        {
-            for (int indexInWorkload = 0; indexInWorkload < currentWorkload.Count; indexInWorkload++)
-            {
-                currentWorkload[indexInWorkload] = CalculatePixelColorFast(currentWorkload[indexInWorkload], pixels, hasData);
-            }
-        }
-
-        private PositionAndColor CalculatePixelColorFast(PositionAndColor positionAndColor, Span<ushort> pixels, bool[,] hasData)
-        {
-            float totalWeight = 0;
-            for (int sampleIndex = 0; sampleIndex < _samplePattern.Length; ++sampleIndex)
-            {
-                int sampleX = _samplePattern[sampleIndex].x + positionAndColor.X;
-                int sampleY = _samplePattern[sampleIndex].y + positionAndColor.Y;
-
-                if (SafeGetHasData(sampleX, sampleY, hasData))
+                if (SafeGetHasData(sampleX, sampleY))
                 {
                     float sampleWeight = _sampleWeights[sampleIndex];
                     totalWeight += sampleWeight;
@@ -212,28 +159,6 @@ namespace ImproveTransparentPixels
 
         private Span<ushort> GetPixel(Span<ushort> pixels, int x, int y) => pixels.Slice((y* _width + x) * _channelCount, _channelCount);
 
-
-        private void UpdateImage(List<PositionAndColor> currentWorkload, MagickImage image)
-        {
-            var pixels = image.GetPixels();
-            for (int indexInWorkload = 0; indexInWorkload < currentWorkload.Count; indexInWorkload++)
-            {
-                var positionAndColor = currentWorkload[indexInWorkload];
-                var pixel = pixels[positionAndColor.X, positionAndColor.Y];
-                for (int x = 0; x < _colorChannelIndices.Length; ++x)
-                {
-                    int newValue = (int)(positionAndColor[x] + 0.5f);
-                    if (newValue < ushort.MinValue || newValue > ushort.MaxValue)
-                    {
-                        System.Console.WriteLine("Possible logic error - newvalue was " + newValue);
-                    }
-
-                    pixel.SetChannel(_colorChannelIndices[x], (ushort)Math.Clamp(newValue, ushort.MinValue, ushort.MaxValue));
-                }
-                pixel.SetChannel(_alphaChannelIndex, ushort.MaxValue);
-            }
-        }
-
         private void UpdateImage(List<PositionAndColor> currentWorkload, Span<ushort> pixels)
         {
             for (int indexInWorkload = 0; indexInWorkload < currentWorkload.Count; indexInWorkload++)
@@ -255,31 +180,30 @@ namespace ImproveTransparentPixels
         }
 
 
-        private void UpdateHasData(List<PositionAndColor> currentWorkload, bool[,] hasData)
+        private void UpdateHasData(List<PositionAndColor> currentWorkload)
         {
             for (int indexInWorkload = 0; indexInWorkload < currentWorkload.Count; indexInWorkload++)
             {
                 var positionAndColor = currentWorkload[indexInWorkload];
-                hasData[positionAndColor.Y, positionAndColor.X] = true;
+                _hasData[positionAndColor.Y, positionAndColor.X] = true;
             }
         }
 
 
-        void NextWorkload(List<PositionAndColor> currentWorkload, bool[,] hasData)
+        void NextWorkload(List<PositionAndColor> currentWorkload)
         {
             HashSet<(int x, int y)> nextPoints = new HashSet<(int x, int y)>();
             foreach (var position in currentWorkload)
             {
                 int x = position.X;
                 int y = position.Y;
-
-                if (CanProcessPixel(x + 1, y, hasData))
+                if (x < _width - 1 && !SafeGetHasData(x + 1, y))
                     nextPoints.Add((x + 1, y));
-                if (CanProcessPixel(x - 1, y, hasData))
+                if (x > 0 && !SafeGetHasData(x - 1, y))
                     nextPoints.Add((x - 1, y));
-                if (CanProcessPixel(x, y + 1, hasData))
+                if (y < _height - 1 && !SafeGetHasData(x, y + 1))
                     nextPoints.Add((x, y + 1));
-                if (CanProcessPixel(x, y - 1, hasData))
+                if (y > 0 && !SafeGetHasData(x, y - 1))
                     nextPoints.Add((x, y - 1));
             }
             currentWorkload.Clear();
@@ -289,25 +213,10 @@ namespace ImproveTransparentPixels
             }
         }
 
-        bool SafeGetHasData(int x, int y, bool[,] hasData) => x >= 0 && y >= 0 && x < _width && y < _height && hasData[y, x];
+        bool SafeGetHasData(int x, int y) => x >= 0 && y >= 0 && x < _width && y < _height && _hasData[y, x];
 
         //NOTE that the returned array should be indexed by [y,x]
-        bool[,] FindNonTransparentPixels(MagickImage image)
-        {
-            bool[,] nonTransparent = new bool[_height, _width];
-            var pixels = image.GetPixels();
-
-            for (int i = 0; i < _height; i++)
-            {
-                for (int j = 0; j < _width; j++)
-                {
-                    nonTransparent[i, j] = pixels.GetPixel(j, i).GetChannel(_alphaChannelIndex) > 0;
-                }
-            }
-            return nonTransparent;
-        }
-
-        bool[,] FindNonTransparentPixels(Span<ushort> pixels)
+        bool[,] FindNonTransparentPixels()
         {
             bool[,] nonTransparent = new bool[_height, _width];
 
@@ -315,7 +224,7 @@ namespace ImproveTransparentPixels
             {
                 for (int j = 0; j < _width; j++)
                 {
-                    var pixel = GetPixel(pixels, j, i);
+                    var pixel = GetPixel(_pixels, j, i);
                     nonTransparent[i, j] = pixel[_alphaChannelIndex] > 0;
                 }
             }
@@ -323,52 +232,43 @@ namespace ImproveTransparentPixels
         }
 
 
-
-
-        List<PositionAndColor> FindStartingPixels(bool[,] hasData)
+        List<PositionAndColor> SolidifyFindStartingPixels()
         {
             List<PositionAndColor> startingPoints = new List<PositionAndColor>();
-            for (int i = 0; i < _height; i++)
+            for (int y = 0; y < _height; y++)
             {
-                for (int j = 0; j < _width; j++)
+                for (int x = 0; x < _width; x++)
                 {
-                    if (CanProcessPixel(j, i, hasData))
-                        startingPoints.Add(new PositionAndColor(j, i));
+                    if (!SafeGetHasData(x, y)
+                        && (SafeGetHasData(x, y + 1)
+                         || SafeGetHasData(x, y - 1)
+                         || SafeGetHasData(x + 1, y)
+                         || SafeGetHasData(x - 1, y)))
+                        startingPoints.Add(new PositionAndColor(x, y));
                 }
             }
             return startingPoints;
         }
 
-        //returns true if pixel(x,y) does not have data, but a nearby pixel does have data
-        bool CanProcessPixel(int x, int y, bool[,] hasData) =>
-            (x >= 0 && y >= 0 && x < _width && y < _height)
-            && !SafeGetHasData(x, y, hasData)
-            && (SafeGetHasData(x, y + 1, hasData)
-                || SafeGetHasData(x, y - 1, hasData)
-                || SafeGetHasData(x + 1, y, hasData)
-                || SafeGetHasData(x - 1, y, hasData));
-
-
-        private MagickImage ImproveTransparentPixelsFast(int maxDistance)
+        public void Solidify(int maxDistance)
         {
-            var image = new MagickImage(_srcImage);
-            ushort[] pixels = image.GetPixels().GetArea(0, 0, _width, _height);
-            Span<ushort> pixelsSpan = pixels;
+            Span<ushort> pixelsSpan = _pixels;
+            List<PositionAndColor> currentWorkload = SolidifyFindStartingPixels();
 
-            bool[,] hasData = FindNonTransparentPixels(pixelsSpan);
-            List<PositionAndColor> currentWorkload = FindStartingPixels(hasData);
-
-            while (currentWorkload.Count > 0)
+            for (int cycles = 0; cycles < maxDistance && currentWorkload.Count > 0; ++cycles)
             {
-                CalculatePixelColorsFast(currentWorkload, pixelsSpan, hasData);
+                SolidifyOnce(currentWorkload, pixelsSpan);
                 UpdateImage(currentWorkload, pixelsSpan);
-                UpdateHasData(currentWorkload, hasData);
-                NextWorkload(currentWorkload, hasData);
+                UpdateHasData(currentWorkload);
+                NextWorkload(currentWorkload);
             }
+        }
 
-            image.GetPixels().SetArea(0, 0, _width, _height, pixels);
-
-            return image;
+        public MagickImage GetOutput()
+        {
+            MagickImage output = new MagickImage(_srcImage);
+            output.GetPixels().SetArea(0,0,_width,_height,_pixels);
+            return output;
         }
     }
 }
