@@ -1,12 +1,4 @@
 ﻿using ImageMagick;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
-
 namespace ImproveTransparentPixels
 {
     internal class Processor
@@ -119,9 +111,27 @@ namespace ImproveTransparentPixels
             _hasData = FindNonTransparentPixels();
         }
 
-        private void SolidifyOnce(List<PositionAndColor> currentWorkload, Span<ushort> pixels)
+
+        private void SolidifyOnceMT(List<PositionAndColor> currentWorkload, ushort[] pixels)
         {
-            for (int indexInWorkload = 0; indexInWorkload < currentWorkload.Count; indexInWorkload++)
+            int workers = Math.Max(8, currentWorkload.Count / 100);
+            if (workers < 2)
+            {
+                SolidifyOnce(currentWorkload, pixels, 0, currentWorkload.Count);
+            }
+            else
+            {
+                Parallel.For(0, workers, workerIndex => {
+                    int start = currentWorkload.Count * workerIndex / workers;
+                    int end = currentWorkload.Count * (workerIndex + 1) / workers;
+                    SolidifyOnce(currentWorkload, pixels, start, end);
+                });
+            }
+        }
+
+        private void SolidifyOnce(List<PositionAndColor> currentWorkload, Span<ushort> pixels, int startIndex, int endIndex)
+        {
+            for (int indexInWorkload = startIndex; indexInWorkload < endIndex; indexInWorkload++)
             {
                 currentWorkload[indexInWorkload] = SolidifyOnePixel(currentWorkload[indexInWorkload], pixels);
             }
@@ -188,10 +198,11 @@ namespace ImproveTransparentPixels
             }
         }
 
-
+        private HashSet<(int x, int y)> _reusablePositionsHashSet = new HashSet<(int x, int y)>();
         void NextWorkload(List<PositionAndColor> currentWorkload)
         {
-            HashSet<(int x, int y)> nextPoints = new HashSet<(int x, int y)>();
+            HashSet<(int x, int y)> nextPoints = _reusablePositionsHashSet;
+            nextPoints.Clear();
             foreach (var position in currentWorkload)
             {
                 int x = position.X;
@@ -256,7 +267,8 @@ namespace ImproveTransparentPixels
 
             for (int cycles = 0; cycles < maxDistance && currentWorkload.Count > 0; ++cycles)
             {
-                SolidifyOnce(currentWorkload, pixelsSpan);
+                //SolidifyOnce(currentWorkload, _pixels, 0, currentWorkload.Count);
+                SolidifyOnceMT(currentWorkload, _pixels);
                 UpdateImage(currentWorkload, pixelsSpan);
                 UpdateHasData(currentWorkload);
                 NextWorkload(currentWorkload);
