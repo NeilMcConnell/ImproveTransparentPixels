@@ -5,7 +5,7 @@ The color information in transparent pixels can become important in two key ways
 https://www.adriancourreges.com/blog/2017/05/09/beware-of-transparent-pixels/
 
 
-Flaming Pear makes a Photoshop plugin which deals with this very well, but I'm writing a stand-alone app for people who would like to get away from having a photoshop step in their pipeline.
+Flaming Pear makes a Photoshop plugin which deals with this very well, but I'm writing a stand-alone app for people who would like to get away from having a photoshop step in their pipeline.  I am using the ImageMagick Magick.Net library to read & write image files.
 
 Note that this program does not change the transparency information (alpha channel), and it does not alter color information in pixels that are not fully transparent. So if you're just looking at the image after processing, it should look the same as it did before processing.
 

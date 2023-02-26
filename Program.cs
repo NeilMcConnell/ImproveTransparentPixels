@@ -1,13 +1,6 @@
-﻿// See https://aka.ms/new-console-template for more information
-using ImageMagick;
-//using System.Runtime.CompilerServices;
-//using static System.Net.Mime.MediaTypeNames;
+﻿using ImageMagick;
 using ImproveTransparentPixels;
-using System.Reflection.Metadata;
 using System.Text.RegularExpressions;
-
-Console.WriteLine("Hello, World!");
-Console.WriteLine(string.Join(", ", args));
 
 if (ParseParameters(args, out string inputFilePath,out List<Operation> operations))
 {
