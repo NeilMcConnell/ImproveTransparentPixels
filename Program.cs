@@ -7,8 +7,9 @@ if (ParseParameters(args, out string inputFilePath,out List<Operation> operation
     try
     {
         MagickNET.Initialize();
-        using MagickImage image = new MagickImage(inputFilePath);
+        using MagickImage image = new MagickImage();
         image.BackgroundColor = MagickColor.FromRgba(0, 0, 0, 0);
+        image.Read(inputFilePath);
         Processor processor = new Processor(image);
         foreach (Operation operation in operations)
         {
