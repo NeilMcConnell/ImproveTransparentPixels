@@ -42,8 +42,8 @@ namespace ImproveTransparentPixels
         private readonly int _channelCount;
         private readonly int _alphaChannelIndex;
         private readonly int[] _colorChannelIndices;
-        private readonly (int x, int y)[] _samplePattern;
-        private readonly float[] _sampleWeights;
+        private (int x, int y)[] _samplePattern;
+        private float[] _sampleWeights;
 
         //processed image
         bool[,] _hasData;  //hasData is true if a pixel is non-transparent, or if it has already been processed
@@ -87,30 +87,38 @@ namespace ImproveTransparentPixels
             //set up the processed Image
             _pixels = _srcImage.GetPixels().GetArea(0, 0, _width, _height);
             _hasData = FindNonTransparentPixels();
-
-            SetSampling(out _samplePattern, out _sampleWeights);
         }
 
 
         //TODO - update sampling pattern?  Gaussian?  Honestly it looks pretty fine even if you just set all weights to 1
-        private void SetSampling(out (int x, int y)[] samplePattern, out float[] sampleWeights)
+        private void SetSampling(FilterShape filterShape, int radius)
         {
             List<(int x, int y)> offsets = new();
-            List<float> weights = new();
 
-            for (int x = -2; x <= 2; ++x)
+            for (int x = -radius; x <= radius; ++x)
             {
-                for (int y = -2; y <= 2; ++y)
+                for (int y = -radius; y <= radius; ++y)
                 {
-                    if (x == 0 && y == 0) continue;
-                    offsets.Add((x, y));
-                    weights.Add(1 / MathF.Sqrt(x * x + y * y));
+                    if (x == 0 && y == 0) continue; //never self-sample
+                    bool includeThisPixel = filterShape switch
+                    {
+                        FilterShape.Square => Math.Abs(x) <= radius && Math.Abs(y) <= radius,
+                        FilterShape.Diamond => Math.Abs(x) + Math.Abs(y) <= radius,
+                        _ => throw new NotImplementedException()
+                    };
+                    if (includeThisPixel)
+                        offsets.Add((x, y));
                 }
             }
-            samplePattern = offsets.ToArray();
-            sampleWeights = weights.ToArray();
-        }
 
+            _samplePattern = offsets.ToArray();
+            _sampleWeights = new float[_samplePattern.Length];
+            for (int i = 0; i < _samplePattern.Length; ++i)
+            {
+                (float x, float y) = _samplePattern[i];
+                _sampleWeights[i] = 1f / MathF.Sqrt(x * x + y * y);
+            }
+        }
 
         private void SolidifyOnceMT(List<PositionAndColor> currentWorkload, ushort[] pixels)
         {
@@ -121,7 +129,8 @@ namespace ImproveTransparentPixels
             }
             else
             {
-                Parallel.For(0, workers, workerIndex => {
+                Parallel.For(0, workers, workerIndex =>
+                {
                     int start = currentWorkload.Count * workerIndex / workers;
                     int end = currentWorkload.Count * (workerIndex + 1) / workers;
                     SolidifyOnce(currentWorkload, pixels, start, end);
@@ -260,8 +269,10 @@ namespace ImproveTransparentPixels
             return startingPoints;
         }
 
-        public void Solidify(int maxDistance)
+        public void Solidify(int maxDistance, FilterShape filterShape, int filterRadius)
         {
+            SetSampling(filterShape, filterRadius);
+
             Span<ushort> pixelsSpan = _pixels;
             List<PositionAndColor> currentWorkload = SolidifyFindStartingPixels();
 

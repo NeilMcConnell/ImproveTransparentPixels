@@ -32,6 +32,7 @@ bool ParseParameters(string[] args, out string inputFilePath, out List<Operation
     operations = new List<Operation>();
 
     Regex solidifyRegex = new Regex(@"^-solidify(:(?<MaxDistance>\d+))?$", RegexOptions.IgnoreCase);
+    Regex solidifyNearestRegex = new Regex(@"^-solidifyNearest(:(?<MaxDistance>\d+))?$", RegexOptions.IgnoreCase);
     Regex colorRegex = new Regex(@"^-color(:(?<Color>[\w#]+))?$", RegexOptions.IgnoreCase);
     Regex previewRegex = new Regex(@"^-preview(:(?<Filename>[\w\.\\\/\:]+))$", RegexOptions.IgnoreCase);
     Regex inputRegex = new Regex(@"^-(in|input)(:(?<Filename>[\w\.\\\/\:]+))$", RegexOptions.IgnoreCase);
@@ -45,14 +46,23 @@ bool ParseParameters(string[] args, out string inputFilePath, out List<Operation
             if ((match = solidifyRegex.Match(arg)) is { Success: true })
             {
                 var solidify = new SolidifyOperation();
-                if (match.Groups.ContainsKey("MaxDistance"))
+                if (match.Groups["MaxDistance"].Success)
+                    solidify.MaxDistance = int.Parse(match.Groups["MaxDistance"].Value);
+                operations.Add(solidify);
+            }
+            else if ((match = solidifyNearestRegex.Match(arg)) is { Success: true })
+            {
+                var solidify = new SolidifyOperation();
+                solidify.FilterRadius = 1;
+                solidify.FilterShape = FilterShape.Diamond;
+                if (match.Groups["MaxDistance"].Success)
                     solidify.MaxDistance = int.Parse(match.Groups["MaxDistance"].Value);
                 operations.Add(solidify);
             }
             else if ((match = colorRegex.Match(arg)) is { Success: true })
             {
                 var setColor = new SetColorOperation();
-                if (match.Groups.ContainsKey("Color"))
+                if (match.Groups["Color"].Success)
                     setColor.Color = new MagickColor(match.Groups["Color"].Value);
                 operations.Add(setColor);
             }
@@ -62,11 +72,11 @@ bool ParseParameters(string[] args, out string inputFilePath, out List<Operation
             }
             else if ((match = outputRegex.Match(arg)) is { Success: true })
             {
-                outputFilePath= match.Groups["Filename"].Value;
+                outputFilePath = match.Groups["Filename"].Value;
             }
             else if ((match = previewRegex.Match(arg)) is { Success: true })
             {
-                previewFilePath= match.Groups["Filename"].Value;
+                previewFilePath = match.Groups["Filename"].Value;
             }
             else
             {
@@ -125,3 +135,9 @@ void UnhandledArgument(string message)
 string GetDefaultOutputFilePath(string inputFilePath) => Path.ChangeExtension(inputFilePath, ".ImprovedTransparent.png");
 
 
+
+public enum FilterShape
+{
+    Square,
+    Diamond,
+}

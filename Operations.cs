@@ -14,8 +14,11 @@ namespace ImproveTransparentPixels
 
     public class SolidifyOperation : Operation
     {
+        public FilterShape FilterShape = FilterShape.Square;
+        public int FilterRadius = 2;
+
         public int MaxDistance = int.MaxValue;
-        void Operation.DoOperation(Processor processor) => processor.Solidify(MaxDistance);
+        void Operation.DoOperation(Processor processor) => processor.Solidify(MaxDistance, FilterShape, FilterRadius);
     }
 
     public class SetColorOperation : Operation
