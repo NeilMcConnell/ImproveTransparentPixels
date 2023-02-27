@@ -11,7 +11,7 @@ Note that this program does not change the transparency information (alpha chann
 
 
 Parameters:
-any paremeter that does not start with a dash (-) will be assumed to be the input file name
+any parameter that does not start with a dash (-) will be assumed to be the input file name
 -in:filename  -> specifies the input file
 -out:filename -> specifies the output file.  If no output file is specified, then the output file will be the input filename with the extension ".ImprovedTransparent.png"
 -preview:filename -> specifies a preview file (optional).  This will be the same as the output file, but with all pixels set fully opaque
