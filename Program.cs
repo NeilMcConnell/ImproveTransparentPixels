@@ -17,7 +17,7 @@ if (ParseParameters(args, out string inputFilePath,out List<Operation> operation
         }
         return 0;
     }
-    catch (NullReferenceException e)
+    catch (Exception e)
     {
         System.Console.WriteLine("Encountered an error during processing - " + e.Message);
     }
