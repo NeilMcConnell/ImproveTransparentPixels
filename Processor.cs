@@ -84,6 +84,10 @@ namespace ImproveTransparentPixels
             _height = srcImage.Height;
             _width = srcImage.Width;
 
+            //set up the processed Image
+            _pixels = _srcImage.GetPixels().GetArea(0, 0, _width, _height);
+            _hasData = FindNonTransparentPixels();
+
             SetSampling(out _samplePattern, out _sampleWeights);
         }
 
@@ -105,10 +109,6 @@ namespace ImproveTransparentPixels
             }
             samplePattern = offsets.ToArray();
             sampleWeights = weights.ToArray();
-
-            //set up the processed Image
-            _pixels = _srcImage.GetPixels().GetArea(0, 0, _width, _height);
-            _hasData = FindNonTransparentPixels();
         }
 
 
