@@ -1,8 +1,7 @@
 {
   "profiles": {
     "ImproveTransparentPixels": {
-      "commandName": "Project",
-      "commandLineArgs": "\"C:\\Users\\neil_\\Documents\\Work\\solidify\\test.png\" -solidify:48 -color:#1199AA -preview:\"C:\\Users\\neil_\\Documents\\Work\\solidify\\test.preview.png\""
+      "commandName": "Project"
     }
   }
 }
